@@ -1,0 +1,2 @@
+id,sku,name,description,price,compare_at_price,categories,sizes,image_url,badge,vendor,status,featured
+,AF-BR-100,Example Bedroom Set,"Includes bed dresser and mirror",1299,1499,Bedroom|Bedroom Sets|Beds|King|Queen,King|Queen,https://example.com/approved-photo.jpg,New,Vendor Name,active,true
