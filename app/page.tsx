@@ -1,4 +1,5 @@
 "use client";
+import CustomerChat from "./components/CustomerChat";
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -60,6 +61,7 @@ const menuGroups = [
       "End Table",
       "Loveseats",
       "Ottomans",
+      "Recliners",
     ],
   },
   {
@@ -525,6 +527,7 @@ export default function Home() {
           </aside>
         </div>
       )}
+      <CustomerChat hidden={cartOpen} />
     </main>
   );
 }

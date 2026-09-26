@@ -76,7 +76,7 @@ const taxonomy = [
     items: [
       "Living Room Sets", "Wall Units", "Sectionals", "Sleeper Sofas", "Bookcases",
       "Sofas", "Cabinets", "Chairs", "Coffee Table", "Sofa Table", "End Table",
-      "Loveseats", "Ottomans",
+      "Loveseats", "Ottomans", "Recliners",
     ],
   },
   {
@@ -120,7 +120,7 @@ const setDefinitions: SetDefinition[] = [
     label: "Living room set",
     group: "Living Rooms",
     category: "Living Room Sets",
-    pieceOptions: ["Sofas", "Loveseats", "Chairs", "Ottomans", "Sectionals", "Sleeper Sofas", "Coffee Table", "End Table", "Sofa Table", "Cabinets", "Wall Units", "Bookcases"],
+    pieceOptions: ["Sofas", "Loveseats", "Chairs", "Recliners", "Ottomans", "Sectionals", "Sleeper Sofas", "Coffee Table", "End Table", "Sofa Table", "Cabinets", "Wall Units", "Bookcases"],
   },
   {
     id: "outdoor-set",

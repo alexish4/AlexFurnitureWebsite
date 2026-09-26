@@ -1,0 +1,25 @@
+.afChat { position: fixed; bottom: 20px; right: 20px; z-index: 45; font-family: Arial, sans-serif; color: #243c35; }
+.afChat[hidden] { display: none; }
+.afChat button { cursor: pointer; font: inherit; }
+.afChat button:disabled { cursor: wait; opacity: .55; }
+.afChat button:focus-visible, .afChat input:focus-visible, .afChat a:focus-visible { outline: 3px solid #b87830; outline-offset: 3px; }
+.afChatToggle { display: block; margin-left: auto; border: 0; border-radius: 30px; padding: 16px 22px; background: #243c35; color: white; box-shadow: 0 5px 25px #0003; font-weight: 700 !important; }
+.afChatPanel { width: min(390px, calc(100vw - 32px)); max-height: calc(100dvh - 110px); display: flex; flex-direction: column; margin-bottom: 12px; background: #fffdf8; border: 1px solid #dbd8cf; border-radius: 18px; overflow: hidden; box-shadow: 0 8px 36px #0003; }
+.afChatPanel header { display: flex; justify-content: space-between; align-items: center; background: #243c35; color: white; padding: 16px; }
+.afChatPanel header small { display: block; margin-top: 5px; font-size: 11px; }
+.afChatPanel header button { border: 0; background: transparent; color: white; font-size: 28px; width: 44px; height: 44px; }
+.afChatNotice { padding: 12px 16px; margin: 0; font-size: 11px; line-height: 1.5; background: #f1eee5; }
+.afChatLog { overflow-y: auto; min-height: 100px; height: 260px; padding: 14px; }
+.afChatBubble { margin: 0 20px 12px 0; padding: 12px; background: #eeeee7; border-radius: 12px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.afChatUser { margin: 0 0 12px 20px; background: #dfebe4; }
+.afChatSpeaker { display: block; font-size: 10px; font-weight: 700; margin-bottom: 4px; }
+.afChatPanel form { padding: 12px 16px; border-top: 1px solid #ddd; }
+.afChatPanel form label { display: block; font-size: 12px; margin-bottom: 6px; }
+.afChatPanel form div { display: flex; gap: 8px; }
+.afChatPanel input { min-width: 0; flex: 1; padding: 12px; border: 1px solid #888; border-radius: 8px; font-size: 16px; background: white; color: #243c35; }
+.afChatPanel form button { border: 0; border-radius: 8px; padding: 12px; color: white; background: #243c35; }
+.afChatPanel footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 4px 16px 16px; font-size: 11px; }
+.afChatPanel footer a, .afChatPanel footer button { color: #243c35; text-decoration: underline; }
+.afChatPanel footer button { padding: 0; border: 0; background: none; }
+.afChatError { color: #8b231b; font-size: 12px; padding: 8px 16px; margin: 0; }
+@media (max-width: 500px) { .afChat { bottom: 12px; right: 12px; } .afChatPanel { max-height: calc(100dvh - 95px); } }
