@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `colors_json` text DEFAULT '[]' NOT NULL;

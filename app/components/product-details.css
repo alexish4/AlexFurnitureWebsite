@@ -1,7 +1,7 @@
 .productImageButton { display: block; width: 100%; padding: 0; border: 0; text-align: left; cursor: pointer; background: transparent; color: inherit; }
 .productInfo h3 .productTitleButton { font: inherit; letter-spacing: inherit; text-transform: none; color: inherit; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; }
 .productTitleButton:hover { text-decoration: underline; }
-.productDetails { width: min(960px, calc(100vw - 28px)); max-height: calc(100dvh - 36px); padding: 0; border: 0; border-radius: 18px; background: #fffdf8; color: #243c35; overflow: auto; box-shadow: 0 20px 80px #0005; }
+.productDetails { margin: auto; width: min(960px, calc(100vw - 28px)); max-height: calc(100dvh - 36px); padding: 0; border: 0; border-radius: 18px; background: #fffdf8; color: #243c35; overflow: auto; box-shadow: 0 20px 80px #0005; }
 .productDetails::backdrop { background: #12201bcc; }
 .productDetailsGrid { display: grid; grid-template-columns: 1fr 1fr; }
 .productDetailsPhoto { min-height: 320px; background: #eeeae1; display: grid; place-items: center; }
@@ -24,4 +24,13 @@
 .productDetailsNote { font-size: 12px; line-height: 1.6; margin-top: 18px; }
 .productDetails :focus-visible, .productImageButton:focus-visible, .productTitleButton:focus-visible { outline: 3px solid #b87830; outline-offset: 3px; }
 .cartVariant { font-size: 13px; font-weight: 600; }
+.originalPrice { color:#777; margin-left:10px; font-size:.8em; font-weight:400; }
+.saleLabel { display:block; font-size:13px; color:#9b3322; margin-top:6px; }
+.productThumbnails { display:flex; flex-wrap:wrap; gap:10px; padding:15px; }
+.productThumbnails button { border:2px solid transparent; background:white; padding:3px; cursor:pointer; border-radius:6px; }
+.productThumbnails button[aria-pressed=true] { border-color:#243c35; }
+.productThumbnails img { width:65px; height:65px; object-fit:contain; }
+.setAddon { display:flex; align-items:flex-start; gap:12px; padding:15px; margin:8px 0; border:1px solid #819b89; border-radius:10px; cursor:pointer; }
+.setAddon input { width:22px; height:22px; flex-shrink:0; }
+.setAddon small { display:block; margin-top:6px; line-height:1.5; }
 @media(max-width: 680px) { .productDetailsGrid { grid-template-columns: 1fr; } .productDetailsPhoto { min-height: 180px; } .productDetailsPhoto img { max-height: 250px; } .productDetailsBody { padding: 24px; } }

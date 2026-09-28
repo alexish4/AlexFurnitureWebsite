@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { products } from "../../../db/schema";
+import { normalizeConfiguration, readConfiguration, type ProductConfiguration } from "../../lib/product-options";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ type ProductInput = {
   categories?: string[] | string;
   sizes?: string[] | string;
   colors?: string[] | string;
+  configuration?: ProductConfiguration;
   imageUrl?: string;
   badge?: string;
   vendor?: string;
@@ -117,6 +119,7 @@ function normalize(input: ProductInput) {
     categoriesJson: JSON.stringify(list(input.categories)),
     sizesJson: JSON.stringify(list(input.sizes)),
     colorsJson: JSON.stringify([...new Set(list(input.colors))]),
+    configurationJson: JSON.stringify(normalizeConfiguration(input.configuration)),
     imageUrl: input.imageUrl?.trim() ?? "",
     badge: input.badge?.trim() ?? "",
     vendor: input.vendor?.trim() ?? "",
@@ -148,6 +151,7 @@ function present(row: typeof products.$inferSelect | StoredProduct | LocalStored
     categories: safeArray(row.categoriesJson),
     sizes: safeArray(row.sizesJson),
     colors: safeArray(row.colorsJson),
+    configuration: readConfiguration(row.configurationJson),
     image: row.imageUrl,
     imageUrl: row.imageUrl,
     badge: row.badge,
@@ -281,7 +285,7 @@ export async function POST(request: Request) {
           ? current.find((row) => row.id === input.id?.trim())
           : current.find((row) => input.sku?.trim() && row.sku === input.sku.trim());
         return toLocalStoredProduct(
-          normalize(existing ? { ...input, colors: input.colors ?? safeArray(existing.colorsJson), id: existing.id, slug: existing.slug } : input),
+          normalize(existing ? { ...input, configuration: input.configuration ?? readConfiguration(existing.configurationJson), colors: input.colors ?? safeArray(existing.colorsJson), id: existing.id, slug: existing.slug } : input),
         );
       });
       const next = [...current];
@@ -300,11 +304,11 @@ export async function POST(request: Request) {
       let resolved = input;
       if (input.id?.trim() || input.sku?.trim()) {
         const [existing] = await db
-          .select({ id: products.id, slug: products.slug, colorsJson: products.colorsJson })
+          .select({ id: products.id, slug: products.slug, colorsJson: products.colorsJson, configurationJson: products.configurationJson })
           .from(products)
           .where(input.id?.trim() ? eq(products.id, input.id.trim()) : eq(products.sku, input.sku!.trim()))
           .limit(1);
-        if (existing) resolved = { ...input, colors: input.colors ?? safeArray(existing.colorsJson), id: existing.id, slug: existing.slug };
+        if (existing) resolved = { ...input, configuration: input.configuration ?? readConfiguration(existing.configurationJson), colors: input.colors ?? safeArray(existing.colorsJson), id: existing.id, slug: existing.slug };
       }
       values.push(normalize(resolved));
     }

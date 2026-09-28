@@ -1,4 +1,5 @@
 import { GET as getPublicProducts } from "../products/route";
+import { normalizeConfiguration } from "../../lib/product-options";
 
 // Server-only configuration. Never prefix these variables with NEXT_PUBLIC_.
 const state = { start: Date.now(), used: 0, active: 0 };
@@ -56,6 +57,8 @@ export async function POST(request: Request) {
       .map((p: Record<string, unknown>) => ({
         name: clip(p.name, 160), sku: clip(p.sku, 80), description: clip(p.description, 700),
         priceUSD: typeof p.price === "number" && Number.isFinite(p.price) ? p.price : null,
+        sizePricesUSD: normalizeConfiguration(p.configuration).sizePrices,
+        optionalExtras: normalizeConfiguration(p.configuration).pieces?.filter((piece)=>piece.optional).map((piece)=>({name:piece.name,additionalPriceUSD:piece.price})),
         categories: Array.isArray(p.categories) ? p.categories.slice(0, 12).map((v) => clip(v, 80)) : [],
         sizes: Array.isArray(p.sizes) ? p.sizes.slice(0, 12).map((v) => clip(v, 40)) : [],
       })).map((p: object) => ({ product: p, score: terms.reduce((sum, term) => sum + (JSON.stringify(p).toLowerCase().includes(term) ? 1 : 0), 0) }))

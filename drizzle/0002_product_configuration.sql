@@ -1,0 +1,1 @@
+ALTER TABLE `products` ADD `configuration_json` text DEFAULT '{}' NOT NULL;

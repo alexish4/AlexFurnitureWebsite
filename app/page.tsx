@@ -1,6 +1,7 @@
 "use client";
 import CustomerChat from "./components/CustomerChat";
 import ProductDetails from "./components/ProductDetails";
+import { listingPrice, money } from "./lib/product-options";
 import { addCartLine, type CartLine, type ShopProduct } from "./lib/cart";
 
 import { useEffect, useMemo, useState } from "react";
@@ -220,7 +221,7 @@ export default function Home() {
   const cartItems = cart;
   const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0);
   const cartTotal = cartItems.reduce(
-    (sum, line) => sum + Math.round(line.product.price * 100) * line.quantity / 100,
+    (sum, line) => sum + Math.round(line.unitPrice * 100) * line.quantity / 100,
     0,
   );
 
@@ -230,8 +231,8 @@ export default function Home() {
     document.getElementById("shop")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  function addToCart(product: Product, color: string, size: string, quantity: number) {
-    setCart(addCartLine(cart, product, color, size, quantity));
+  function addToCart(product: Product, color: string, size: string, quantity: number, extras: string[]) {
+    setCart(addCartLine(cart, product, color, size, quantity, extras));
     setSelectedProduct(null);
     setCartOpen(true);
   }
@@ -367,7 +368,7 @@ export default function Home() {
                     </div>
                   )}
                   <div>
-                    <strong>${product.price.toLocaleString()}</strong>
+                    <span>{listingPrice(product).from && <small>From </small>}<strong>{money(listingPrice(product).total)}</strong>{listingPrice(product).original !== null && <del className="originalPrice">{money(listingPrice(product).original!)}</del>}</span>
                     <button onClick={() => setSelectedProduct(product)}>View options</button>
                   </div>
                 </div>
@@ -467,7 +468,8 @@ export default function Home() {
                   <div>
                     <h3>{line.product.name}</h3>
                     {(line.color || line.size) && <p className="cartVariant">{[line.color && `Color: ${line.color}`, line.size && `Size: ${line.size}`].filter(Boolean).join(" · ")}</p>}
-                    <p>${line.product.price.toLocaleString()} · Qty {line.quantity}</p>
+                    <p>{money(line.unitPrice)} · Qty {line.quantity}</p>
+                    {line.extraNames.length > 0 && <p className="cartVariant">Extras: {line.extraNames.join(", ")}</p>}
                     <button onClick={() => setCart((current) => current.filter((item) => item.key !== line.key))}>Remove</button>
                   </div>
                 </div>
@@ -483,7 +485,7 @@ export default function Home() {
           </aside>
         </div>
       )}
-      {selectedProduct && <ProductDetails key={selectedProduct.id} product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={(color, size, quantity) => addToCart(selectedProduct, color, size, quantity)} />}
+      {selectedProduct && <ProductDetails key={selectedProduct.id} product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={(color, size, quantity, extras) => addToCart(selectedProduct, color, size, quantity, extras)} />}
       <CustomerChat hidden={cartOpen || !!selectedProduct} />
     </main>
   );

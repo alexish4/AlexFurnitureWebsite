@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { ColorEditor, PhotoEditor, SizePriceEditor } from "../components/CatalogOptionsEditor";
+import { type ProductConfiguration, type SetPiece } from "../lib/product-options";
 
 type Product = {
   id: string;
@@ -18,6 +20,7 @@ type Product = {
   vendor: string;
   status: "active" | "draft";
   featured: boolean;
+  configuration: ProductConfiguration;
 };
 
 type ProductChoice = { group: string; item: string };
@@ -30,16 +33,7 @@ type SetDefinition = {
   pieceOptions: string[];
 };
 
-type PieceDraft = {
-  localId: string;
-  type: string;
-  name: string;
-  sku: string;
-  price: number;
-  compareAtPrice: number | null;
-  imageUrl: string;
-  sizes: string[];
-};
+type PieceDraft = SetPiece;
 
 const blank: Product = {
   id: "",
@@ -56,6 +50,7 @@ const blank: Product = {
   vendor: "",
   status: "active",
   featured: false,
+  configuration: {},
 };
 
 const taxonomy = [
@@ -196,9 +191,14 @@ function labelForCategory(category: string) {
   return category.split(" / ").at(-1) ?? category;
 }
 
+function pieceLabel(type: string) { return type === "Mattresses" ? "Mattress" : type.replace(/s$/, ""); }
+
 function newPiece(type: string): PieceDraft {
   return {
-    localId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    localId: crypto.randomUUID(),
+    description: "",
+    optional: false,
+    configuration: {},
     type,
     name: "",
     sku: "",
@@ -352,6 +352,7 @@ export default function AdminPage() {
     setPieces([]);
     update("categories", []);
     update("sizes", []);
+    update("configuration", {});
   }
 
   function selectSingle(nextChoice: ProductChoice) {
@@ -362,15 +363,11 @@ export default function AdminPage() {
 
   function selectSet(definition: SetDefinition) {
     setSetId(definition.id);
-    setPieces([]);
+    const defaults = definition.id.includes("bedroom") ? ["Beds", "Nightstands", "Mirrors", "Dresser"] : definition.id === "living-room-set" ? ["Sofas", "Loveseats"] : [];
+    setPieces(defaults.filter((type) => definition.pieceOptions.includes(type)).map(newPiece));
+    update("configuration", {});
     update("categories", categoriesFor({ group: definition.group, item: definition.category }));
     update("sizes", []);
-  }
-
-  function toggleSize(size: string) {
-    update("sizes", form.sizes.includes(size)
-      ? form.sizes.filter((item) => item !== size)
-      : [...form.sizes, size]);
   }
 
   function updatePiece<K extends keyof PieceDraft>(localId: string, key: K, value: PieceDraft[K]) {
@@ -379,22 +376,17 @@ export default function AdminPage() {
 
   function changePieceType(piece: PieceDraft, type: string) {
     setPieces((current) => current.map((candidate) => candidate.localId === piece.localId
-      ? { ...candidate, type, sizes: needsSize(type) ? candidate.sizes : [] }
+      ? { ...candidate, type, optional: needsSize(type) ? false : candidate.optional, configuration: needsSize(type) ? candidate.configuration : {...candidate.configuration,sizePrices:{},sizeOriginalPrices:{}}, sizes: needsSize(type) ? candidate.sizes : [] }
       : candidate));
   }
 
-  function togglePieceSize(piece: PieceDraft, size: string) {
-    updatePiece(piece.localId, "sizes", piece.sizes.includes(size)
-      ? piece.sizes.filter((item) => item !== size)
-      : [...piece.sizes, size]);
-  }
-
   function beginEdit(product: Product) {
-    setForm({ ...product, colors: product.colors || [] });
-    setMode("single");
+    const config = product.configuration || {};
+    setForm({ ...product, colors: product.colors || [], configuration: { ...config, sizeOriginalPrices: { ...Object.fromEntries(product.compareAtPrice == null ? [] : product.sizes.filter((size)=>config.sizePrices?.[size] === undefined).map((size)=>[size,product.compareAtPrice!])), ...config.sizeOriginalPrices }, sizePrices: Object.fromEntries(product.sizes.map((size) => [size, config.sizePrices?.[size] ?? product.price])) } });
+    setMode(config.setType ? "set" : "single");
     setChoice(choiceFromCategories(product.categories));
-    setSetId("");
-    setPieces([]);
+    setSetId(config.setType || "");
+    setPieces((config.pieces || []).map((piece) => ({...piece, configuration: {...piece.configuration, sizePrices: Object.fromEntries(piece.sizes.map((size) => [size, piece.configuration?.sizePrices?.[size] ?? piece.price]))} })));
     window.scrollTo({ top: 190, behavior: "smooth" });
   }
 
@@ -405,11 +397,11 @@ export default function AdminPage() {
       setStatus("Choose at least one size for this bed item.");
       return;
     }
-    if (!form.id && mode === "set") {
+    if (mode === "set") {
       if (!selectedSet) { setStatus("Choose what type of set you are adding."); return; }
       if (!pieces.length) { setStatus("Add at least one individual piece to the set."); return; }
-      const incompletePiece = pieces.find((piece) => !piece.name.trim() || piece.price <= 0);
-      if (incompletePiece) { setStatus("Every set piece needs a name and price."); return; }
+      const incompletePiece = pieces.find((piece) => piece.price <= 0);
+      if (incompletePiece) { setStatus("Every set piece needs an individual price. Names are filled automatically if left blank."); return; }
       const unsizedBed = pieces.find((piece) => needsSize(piece.type) && !piece.sizes.length);
       if (unsizedBed) { setStatus(`Choose a size for ${unsizedBed.name || "each bed item"}.`); return; }
     }
@@ -418,15 +410,16 @@ export default function AdminPage() {
     setStatus(mode === "set" && !form.id ? "Creating the set and its individual pieces…" : "Saving product…");
     try {
       let body: { product: Product } | { products: Product[] };
-      if (!form.id && mode === "set" && selectedSet) {
+      if (mode === "set" && selectedSet) {
         const setChoice = { group: selectedSet.group, item: selectedSet.category };
-        const setSizes = Array.from(new Set(pieces.flatMap((piece) => piece.sizes)));
-        const setProduct: Product = { ...form, categories: categoriesFor(setChoice), sizes: setSizes };
+        const setSizes = Array.from(new Set(pieces.filter((piece) => !piece.optional).flatMap((piece) => piece.sizes)));
+        const setProduct: Product = { ...form, categories: categoriesFor(setChoice), sizes: setSizes, configuration: { ...form.configuration, setType: selectedSet.id, pieces: pieces.map((piece) => ({ ...piece, name: piece.name.trim() || `${form.name} — ${pieceLabel(piece.type)}` })) } };
         const individualProducts: Product[] = pieces.map((piece) => ({
-          id: "",
+          id: piece.localId,
           sku: piece.sku,
-          name: piece.name,
-          description: `Available individually from the ${form.name}.`,
+          name: piece.name.trim() || `${form.name} — ${pieceLabel(piece.type)}`,
+          description: piece.description,
+          configuration: piece.configuration,
           price: piece.price,
           compareAtPrice: piece.compareAtPrice,
           categories: categoriesFor({ group: selectedSet.group, item: piece.type }),
@@ -624,13 +617,14 @@ export default function AdminPage() {
                   <label>SKU<input value={form.sku} onChange={(event) => update("sku", event.target.value)} placeholder="AF-BR-100" /></label>
                 </div>
                 <label>Description<textarea value={form.description} onChange={(event) => update("description", event.target.value)} placeholder="Materials, pieces included, colors, and other details…" /></label>
-                <label>Available colors, optional<input value={form.colors.join(" | ")} onChange={(event) => update("colors", event.target.value.split("|"))} placeholder="Beige | Gray | Brown" /><span>Separate colors with |. Customers choose before adding to cart. For a set, these colors also apply to its new individual pieces; edit pieces afterward if needed.</span></label>
-                <p>All listed colors and sizes use the price below. List differently priced options as separate products for now.</p>
+                <ColorEditor colors={form.colors} onChange={(colors) => update("colors", colors)} />
+                <p>{mode === "set" ? "Base set price includes the standard pieces only. Optional pieces are added to the customer total. Enter complete set prices for each size below." : "The base price applies when no size-specific price is entered."}</p>
                 <div className="fieldRow">
                   <label>Price ($)<input required min="0" step="0.01" type="number" value={form.price || ""} onChange={(event) => update("price", Number(event.target.value))} placeholder="1299" /></label>
                   <label>Original price, optional ($)<input min="0" step="0.01" type="number" value={form.compareAtPrice ?? ""} onChange={(event) => update("compareAtPrice", event.target.value ? Number(event.target.value) : null)} placeholder="1499" /></label>
                 </div>
                 <label>Product photo URL<input value={form.imageUrl} onChange={(event) => update("imageUrl", event.target.value)} placeholder="https://manufacturer.com/product-photo.jpg" /></label>
+                <PhotoEditor value={form.configuration} colors={form.colors} onChange={(value) => update("configuration", {...form.configuration,...value})} />
                 {form.imageUrl && <img className="imagePreview" src={form.imageUrl} alt="Product preview" />}
                 <div className="fieldRow">
                   <label>Vendor / manufacturer<input value={form.vendor} onChange={(event) => update("vendor", event.target.value)} placeholder="Ashley, Coaster, etc." /></label>
@@ -638,49 +632,46 @@ export default function AdminPage() {
                 </div>
 
                 {mode === "single" && choice && needsSize(choice.item) ? (
-                  <fieldset className="guidedBlock">
-                    <legend>Choose every available size</legend>
-                    <span className="guidedHint">A bed item cannot be saved until at least one size is selected.</span>
-                    <div className="sizeChoices">
-                      {bedSizes.map((size) => <button className="sizeChoice" type="button" aria-pressed={form.sizes.includes(size)} key={size} onClick={() => toggleSize(size)}>{size}</button>)}
-                    </div>
-                  </fieldset>
-                ) : (
-                  <label>Sizes, optional<input value={form.sizes.join(" | ")} onChange={(event) => update("sizes", event.target.value.split("|").map((item) => item.trim()).filter(Boolean))} placeholder="Small | Medium | Large" /></label>
-                )}
+                  <SizePriceEditor sizes={form.sizes} choices={bedSizes} value={form.configuration} onSizes={(sizes) => update("sizes",sizes)} onChange={(value) => update("configuration", {...form.configuration,...value})} label="Individual price" />
+                ) : mode === "single" ? (
+                  <><label>Sizes, optional<input value={form.sizes.join(" | ")} onChange={(event) => update("sizes", event.target.value.split("|").map((item) => item.trim()).filter(Boolean))} placeholder="Small | Medium | Large" /></label>
+                  {form.sizes.length > 0 && <SizePriceEditor sizes={form.sizes} choices={form.sizes} value={form.configuration} onChange={(value) => update("configuration", {...form.configuration,...value})} />}</>
+                ) : null}
 
                 <div className="fieldRow">
                   <label>Status<select value={form.status} onChange={(event) => update("status", event.target.value as "active" | "draft")}><option value="active">Active — visible online</option><option value="draft">Draft — hidden</option></select></label>
                   <label className="featuredCheck"><input type="checkbox" checked={form.featured} onChange={(event) => update("featured", event.target.checked)} /> Feature this product on the homepage</label>
                 </div>
 
-                {!form.id && mode === "set" && selectedSet && (
+                {mode === "set" && selectedSet && (
                   <section className="setBuilder">
                     <div className="setBuilderHeader">
                       <div><p>Individual products</p><h3>3. Add every piece in this set</h3><p>Each piece below will also become its own product automatically.</p></div>
                       <button className="addPieceButton" type="button" onClick={() => setPieces((current) => [...current, newPiece(selectedSet.pieceOptions[0])])}>+ Add a piece</button>
                     </div>
+                    <div className="optionButtons">{selectedSet.pieceOptions.map((type) => <button type="button" key={type} onClick={() => setPieces((current) => [...current,{...newPiece(type), optional: type === "Chests" || (selectedSet.id === "living-room-set" && type === "Chairs") }])}>+ Add {type}</button>)}</div>
+                    <p>Names are generated from the set name when left blank. Mark extra pieces optional so customers can add them for the displayed individual price. Saving a set also updates its linked individual products; edit their shared details here.</p>
                     {pieces.map((piece, index) => (
                       <article className="pieceCard" key={piece.localId}>
                         <div className="pieceCardHeader"><strong>Piece {index + 1}</strong><button className="removePiece" type="button" onClick={() => setPieces((current) => current.filter((item) => item.localId !== piece.localId))}>Remove piece</button></div>
                         <label>What kind of piece is it?<select value={piece.type} onChange={(event) => changePieceType(piece, event.target.value)}>{selectedSet.pieceOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
                         <div className="fieldRow">
-                          <label>Product name<input required value={piece.name} onChange={(event) => updatePiece(piece.localId, "name", event.target.value)} placeholder={`${form.name || "Set"} — ${piece.type.replace(/s$/, "")}`} /></label>
+                          <label>Product name (optional)<input value={piece.name} onChange={(event) => updatePiece(piece.localId, "name", event.target.value)} placeholder={`${form.name || "Set"} — ${piece.type.replace(/s$/, "")}`} /></label>
                           <label>SKU<input value={piece.sku} onChange={(event) => updatePiece(piece.localId, "sku", event.target.value)} placeholder="Individual piece SKU" /></label>
                         </div>
+                        <label>Individual description<textarea value={piece.description} onChange={(event) => updatePiece(piece.localId,"description",event.target.value)} placeholder="Details about this individual piece…" /></label>
+                        <label className="pieceOptional"><input type="checkbox" checked={piece.optional} disabled={needsSize(piece.type)} onChange={(event) => updatePiece(piece.localId,"optional",event.target.checked)} />Optional extra — customer chooses whether to add it</label>
                         <div className="fieldRow">
                           <label>Individual price ($)<input required min="0.01" step="0.01" type="number" value={piece.price || ""} onChange={(event) => updatePiece(piece.localId, "price", Number(event.target.value))} /></label>
                           <label>Original price, optional ($)<input min="0" step="0.01" type="number" value={piece.compareAtPrice ?? ""} onChange={(event) => updatePiece(piece.localId, "compareAtPrice", event.target.value ? Number(event.target.value) : null)} /></label>
                         </div>
                         <label>Piece photo URL, optional<input value={piece.imageUrl} onChange={(event) => updatePiece(piece.localId, "imageUrl", event.target.value)} placeholder="Leave blank to use the set photo" /></label>
-                        {needsSize(piece.type) && (
-                          <fieldset className="guidedBlock">
-                            <legend>Size for this {piece.type.toLowerCase()}</legend>
-                            <div className="sizeChoices">{bedSizes.map((size) => <button className="sizeChoice" type="button" aria-pressed={piece.sizes.includes(size)} key={size} onClick={() => togglePieceSize(piece, size)}>{size}</button>)}</div>
-                          </fieldset>
-                        )}
+                        <PhotoEditor value={piece.configuration} colors={form.colors} onChange={(value)=>updatePiece(piece.localId,"configuration",value)} />
+                        {needsSize(piece.type) && <SizePriceEditor sizes={piece.sizes} choices={bedSizes} value={piece.configuration} onSizes={(sizes)=>updatePiece(piece.localId,"sizes",sizes)} onChange={(value)=>updatePiece(piece.localId,"configuration",value)} label="Individual price" />}
+
                       </article>
                     ))}
+                    {pieces.some((piece) => !piece.optional && piece.sizes.length) && <SizePriceEditor sizes={[...new Set(pieces.filter((piece)=>!piece.optional).flatMap((piece)=>piece.sizes))]} choices={[]} value={form.configuration} onChange={(value)=>update("configuration", {...form.configuration,...value})} label="Complete set price" />}
                   </section>
                 )}
 
