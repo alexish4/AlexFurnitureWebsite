@@ -14,6 +14,7 @@ type ProductInput = {
   compareAtPrice?: number | string | null;
   categories?: string[] | string;
   sizes?: string[] | string;
+  colors?: string[] | string;
   imageUrl?: string;
   badge?: string;
   vendor?: string;
@@ -115,6 +116,7 @@ function normalize(input: ProductInput) {
     compareAtPriceCents: moneyToCents(input.compareAtPrice),
     categoriesJson: JSON.stringify(list(input.categories)),
     sizesJson: JSON.stringify(list(input.sizes)),
+    colorsJson: JSON.stringify([...new Set(list(input.colors))]),
     imageUrl: input.imageUrl?.trim() ?? "",
     badge: input.badge?.trim() ?? "",
     vendor: input.vendor?.trim() ?? "",
@@ -125,9 +127,9 @@ function normalize(input: ProductInput) {
   };
 }
 
-function safeArray(value: string) {
+function safeArray(value: string | undefined) {
   try {
-    const parsed = JSON.parse(value);
+    const parsed = JSON.parse(value || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -145,6 +147,7 @@ function present(row: typeof products.$inferSelect | StoredProduct | LocalStored
     compareAtPrice: row.compareAtPriceCents === null ? null : row.compareAtPriceCents / 100,
     categories: safeArray(row.categoriesJson),
     sizes: safeArray(row.sizesJson),
+    colors: safeArray(row.colorsJson),
     image: row.imageUrl,
     imageUrl: row.imageUrl,
     badge: row.badge,
@@ -278,7 +281,7 @@ export async function POST(request: Request) {
           ? current.find((row) => row.id === input.id?.trim())
           : current.find((row) => input.sku?.trim() && row.sku === input.sku.trim());
         return toLocalStoredProduct(
-          normalize(existing ? { ...input, id: existing.id, slug: existing.slug } : input),
+          normalize(existing ? { ...input, colors: input.colors ?? safeArray(existing.colorsJson), id: existing.id, slug: existing.slug } : input),
         );
       });
       const next = [...current];
@@ -295,13 +298,13 @@ export async function POST(request: Request) {
     const values = [];
     for (const input of inputs) {
       let resolved = input;
-      if (!input.id?.trim() && input.sku?.trim()) {
+      if (input.id?.trim() || input.sku?.trim()) {
         const [existing] = await db
-          .select({ id: products.id, slug: products.slug })
+          .select({ id: products.id, slug: products.slug, colorsJson: products.colorsJson })
           .from(products)
-          .where(eq(products.sku, input.sku.trim()))
+          .where(input.id?.trim() ? eq(products.id, input.id.trim()) : eq(products.sku, input.sku!.trim()))
           .limit(1);
-        if (existing) resolved = { ...input, id: existing.id, slug: existing.slug };
+        if (existing) resolved = { ...input, colors: input.colors ?? safeArray(existing.colorsJson), id: existing.id, slug: existing.slug };
       }
       values.push(normalize(resolved));
     }

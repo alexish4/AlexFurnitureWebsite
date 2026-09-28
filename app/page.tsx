@@ -1,17 +1,11 @@
 "use client";
 import CustomerChat from "./components/CustomerChat";
+import ProductDetails from "./components/ProductDetails";
+import { addCartLine, type CartLine, type ShopProduct } from "./lib/cart";
 
 import { useEffect, useMemo, useState } from "react";
 
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  categories: string[];
-  sizes?: string[];
-  badge?: string;
-};
+type Product = ShopProduct;
 
 const menuGroups = [
   {
@@ -157,45 +151,6 @@ const categoryCards = [
   },
 ];
 
-const starterProducts: Product[] = [
-  {
-    id: "p1",
-    name: "Canyon Cloud Sectional",
-    price: 1299,
-    badge: "Store favorite",
-    categories: ["Living Rooms", "Living Rooms / Sectionals"],
-    image:
-      "https://images.unsplash.com/photo-1550254478-ead40cc54513?auto=format&fit=crop&w=1100&q=82",
-  },
-  {
-    id: "p2",
-    name: "Magnolia Dining Set",
-    price: 899,
-    badge: "7-piece set",
-    categories: ["Dining", "Dining / Dining Room Sets"],
-    image:
-      "https://images.unsplash.com/photo-1604578762246-41134e37f9cc?auto=format&fit=crop&w=1100&q=82",
-  },
-  {
-    id: "p3",
-    name: "Solana Upholstered Bed",
-    price: 749,
-    categories: ["Bedroom", "Bedroom / Beds"],
-    sizes: ["King", "Queen"],
-    image:
-      "https://images.unsplash.com/photo-1617104678098-de229db51175?auto=format&fit=crop&w=1100&q=82",
-  },
-  {
-    id: "p4",
-    name: "Central Avenue Recliner",
-    price: 599,
-    badge: "Power reclining",
-    categories: ["Living Rooms", "Living Rooms / Chairs"],
-    image:
-      "https://images.unsplash.com/photo-1567016432779-094069958ea5?auto=format&fit=crop&w=1100&q=82",
-  },
-];
-
 const stores = [
   {
     city: "Montclair",
@@ -212,18 +167,24 @@ const stores = [
 ];
 
 export default function Home() {
-  const [catalog, setCatalog] = useState(starterProducts);
+  const [catalog, setCatalog] = useState<Product[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState("Loading products…");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
-  const [cart, setCart] = useState<Record<string, number>>({});
+  const [cart, setCart] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/products")
       .then((response) => response.ok ? response.json() : Promise.reject())
-      .then((data) => data.products?.length && setCatalog(data.products))
-      .catch(() => undefined);
+      .then((data) => {
+        if (!Array.isArray(data.products)) throw new Error("Invalid catalog");
+        setCatalog(data.products);
+        setCatalogStatus("");
+      })
+      .catch(() => setCatalogStatus("We could not load the catalog. Please refresh or call a store."));
   }, []);
 
   const products = useMemo(() => {
@@ -256,10 +217,10 @@ export default function Home() {
     });
   }, [activeCategory, catalog, search]);
 
-  const cartItems = catalog.filter((product) => cart[product.id]);
-  const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
+  const cartItems = cart;
+  const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0);
   const cartTotal = cartItems.reduce(
-    (sum, product) => sum + product.price * cart[product.id],
+    (sum, line) => sum + Math.round(line.product.price * 100) * line.quantity / 100,
     0,
   );
 
@@ -269,11 +230,9 @@ export default function Home() {
     document.getElementById("shop")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  function addToCart(product: Product) {
-    setCart((current) => ({
-      ...current,
-      [product.id]: (current[product.id] ?? 0) + 1,
-    }));
+  function addToCart(product: Product, color: string, size: string, quantity: number) {
+    setCart(addCartLine(cart, product, color, size, quantity));
+    setSelectedProduct(null);
     setCartOpen(true);
   }
 
@@ -391,17 +350,17 @@ export default function Home() {
           </label>
         </div>
 
-        {products.length ? (
+        {catalogStatus ? <p role="status">{catalogStatus}</p> : products.length ? (
           <div className="productGrid">
             {products.map((product) => (
               <article className="productCard" key={product.id}>
-                <div className="productImage">
+                <button type="button" className="productImage productImageButton" onClick={() => setSelectedProduct(product)} aria-label={`View ${product.name}`}>
                   <img src={product.image} alt={product.name} />
                   {product.badge && <span>{product.badge}</span>}
-                </div>
+                </button>
                 <div className="productInfo">
                   <p>{product.categories.slice(0, 2).map(categoryLabel).join(" · ")}</p>
-                  <h3>{product.name}</h3>
+                  <h3><button type="button" className="productTitleButton" onClick={() => setSelectedProduct(product)}>{product.name}</button></h3>
                   {product.sizes && (
                     <div className="sizeList">
                       {product.sizes.map((size) => <span key={size}>{size}</span>)}
@@ -409,7 +368,7 @@ export default function Home() {
                   )}
                   <div>
                     <strong>${product.price.toLocaleString()}</strong>
-                    <button onClick={() => addToCart(product)}>Add to cart</button>
+                    <button onClick={() => setSelectedProduct(product)}>View options</button>
                   </div>
                 </div>
               </article>
@@ -502,17 +461,14 @@ export default function Home() {
               <button onClick={() => setCartOpen(false)} aria-label="Close cart">×</button>
             </div>
             <div className="cartItems">
-              {cartItems.length ? cartItems.map((product) => (
-                <div className="cartItem" key={product.id}>
-                  <img src={product.image} alt="" />
+              {cartItems.length ? cartItems.map((line) => (
+                <div className="cartItem" key={line.key}>
+                  <img src={line.product.image} alt="" />
                   <div>
-                    <h3>{product.name}</h3>
-                    <p>${product.price.toLocaleString()} · Qty {cart[product.id]}</p>
-                    <button onClick={() => setCart((current) => {
-                      const next = { ...current };
-                      delete next[product.id];
-                      return next;
-                    })}>Remove</button>
+                    <h3>{line.product.name}</h3>
+                    {(line.color || line.size) && <p className="cartVariant">{[line.color && `Color: ${line.color}`, line.size && `Size: ${line.size}`].filter(Boolean).join(" · ")}</p>}
+                    <p>${line.product.price.toLocaleString()} · Qty {line.quantity}</p>
+                    <button onClick={() => setCart((current) => current.filter((item) => item.key !== line.key))}>Remove</button>
                   </div>
                 </div>
               )) : <div className="cartEmpty"><p>Your cart is ready for something beautiful.</p><button onClick={() => setCartOpen(false)}>Keep shopping</button></div>}
@@ -527,7 +483,8 @@ export default function Home() {
           </aside>
         </div>
       )}
-      <CustomerChat hidden={cartOpen} />
+      {selectedProduct && <ProductDetails key={selectedProduct.id} product={selectedProduct} onClose={() => setSelectedProduct(null)} onAdd={(color, size, quantity) => addToCart(selectedProduct, color, size, quantity)} />}
+      <CustomerChat hidden={cartOpen || !!selectedProduct} />
     </main>
   );
 }

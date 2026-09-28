@@ -12,6 +12,7 @@ export const products = sqliteTable(
     compareAtPriceCents: integer("compare_at_price_cents"),
     categoriesJson: text("categories_json").notNull().default("[]"),
     sizesJson: text("sizes_json").notNull().default("[]"),
+    colorsJson: text("colors_json").notNull().default("[]"),
     imageUrl: text("image_url").notNull().default(""),
     badge: text("badge").notNull().default(""),
     vendor: text("vendor").notNull().default(""),

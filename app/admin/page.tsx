@@ -12,6 +12,7 @@ type Product = {
   compareAtPrice: number | null;
   categories: string[];
   sizes: string[];
+  colors: string[];
   imageUrl: string;
   badge: string;
   vendor: string;
@@ -49,6 +50,7 @@ const blank: Product = {
   compareAtPrice: null,
   categories: [],
   sizes: [],
+  colors: [],
   imageUrl: "",
   badge: "",
   vendor: "",
@@ -388,7 +390,7 @@ export default function AdminPage() {
   }
 
   function beginEdit(product: Product) {
-    setForm(product);
+    setForm({ ...product, colors: product.colors || [] });
     setMode("single");
     setChoice(choiceFromCategories(product.categories));
     setSetId("");
@@ -429,6 +431,7 @@ export default function AdminPage() {
           compareAtPrice: piece.compareAtPrice,
           categories: categoriesFor({ group: selectedSet.group, item: piece.type }),
           sizes: piece.sizes,
+          colors: form.colors,
           imageUrl: piece.imageUrl || form.imageUrl,
           badge: "",
           vendor: form.vendor,
@@ -491,6 +494,7 @@ export default function AdminPage() {
           compareAtPrice: row.compare_at_price || null,
           categories: automaticChoice ? categoriesFor(automaticChoice) : row.categories?.split("|").filter(Boolean) ?? [],
           sizes: row.sizes?.split("|").filter(Boolean) ?? [],
+          ...(row.colors !== undefined ? { colors: row.colors.split("|").map((value) => value.trim()).filter(Boolean) } : {}),
           imageUrl: row.image_url,
           badge: row.badge,
           vendor: row.vendor,
@@ -517,7 +521,7 @@ export default function AdminPage() {
   }
 
   function downloadTemplate() {
-    const csv = 'id,sku,name,description,price,compare_at_price,room,product_type,sizes,image_url,badge,vendor,status,featured\n,AF-LR-100,Example Sofa,"Comfortable living room sofa",899,1099,Living Rooms,Sofas,,https://example.com/photo.jpg,New,Vendor Name,active,true\n';
+    const csv = 'id,sku,name,description,price,compare_at_price,room,product_type,sizes,colors,image_url,badge,vendor,status,featured\n,AF-LR-100,Example Sofa,"Comfortable living room sofa",899,1099,Living Rooms,Sofas,,Beige|Gray,https://example.com/photo.jpg,New,Vendor Name,active,true\n';
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const link = document.createElement("a");
     link.href = url;
@@ -620,6 +624,8 @@ export default function AdminPage() {
                   <label>SKU<input value={form.sku} onChange={(event) => update("sku", event.target.value)} placeholder="AF-BR-100" /></label>
                 </div>
                 <label>Description<textarea value={form.description} onChange={(event) => update("description", event.target.value)} placeholder="Materials, pieces included, colors, and other details…" /></label>
+                <label>Available colors, optional<input value={form.colors.join(" | ")} onChange={(event) => update("colors", event.target.value.split("|"))} placeholder="Beige | Gray | Brown" /><span>Separate colors with |. Customers choose before adding to cart. For a set, these colors also apply to its new individual pieces; edit pieces afterward if needed.</span></label>
+                <p>All listed colors and sizes use the price below. List differently priced options as separate products for now.</p>
                 <div className="fieldRow">
                   <label>Price ($)<input required min="0" step="0.01" type="number" value={form.price || ""} onChange={(event) => update("price", Number(event.target.value))} placeholder="1299" /></label>
                   <label>Original price, optional ($)<input min="0" step="0.01" type="number" value={form.compareAtPrice ?? ""} onChange={(event) => update("compareAtPrice", event.target.value ? Number(event.target.value) : null)} placeholder="1499" /></label>
