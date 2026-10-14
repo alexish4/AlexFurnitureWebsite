@@ -10,8 +10,23 @@ export type ProductConfiguration = PriceOptions & { setType?: string; pieces?: S
 export const money = (value: number) => value.toLocaleString("en-US", { style: "currency", currency: "USD" });
 export const cents = (value: number) => Math.round(value * 100);
 
+// Keep the package discount: only the price difference between sizes is added.
+export function automaticSetPrices(price: number, original: number | null | undefined, pieces: SetPiece[]) {
+  const sized = pieces.filter((piece) => !piece.optional && piece.sizes.length > 0);
+  const sizes = sized.length ? [...new Set(sized[0].sizes)].filter((size) => sized.every((piece) => piece.sizes.includes(size))) : [];
+  const totals = sizes.map((size) => sized.reduce((sum, piece) => sum + cents(piece.configuration?.sizePrices?.[size] ?? piece.price), 0));
+  const minimum = totals.length ? Math.min(...totals) : 0;
+  const sizePrices = Object.fromEntries(sizes.map((size, index) => [size, (cents(price) + totals[index] - minimum) / 100]));
+  const sizeOriginalPrices = Object.fromEntries(original == null ? [] : sizes.map((size,index) => [size, (cents(original) + totals[index] - minimum) / 100]));
+  const baseSize = sizes[totals.indexOf(minimum)] || "";
+  return { sizes, sizePrices, sizeOriginalPrices, baseSize };
+}
+
 export function selectionPrice(product: { price: number; compareAtPrice?: number | null; configuration?: ProductConfiguration }, size: string, extras: string[] = []) {
-  const config = product.configuration || {};
+  const stored = product.configuration || {};
+  const auto = stored.setType && stored.pieces?.some((piece)=>!piece.optional && piece.sizes.length)
+    ? automaticSetPrices(product.price, product.compareAtPrice, stored.pieces) : null;
+  const config = auto ? { ...stored, sizePrices: auto.sizePrices, sizeOriginalPrices: auto.sizeOriginalPrices } : stored;
   const base = config.sizePrices?.[size] ?? product.price;
   // An overridden size price needs its own original price; do not invent a discount.
   const original = size && config.sizePrices?.[size] !== undefined

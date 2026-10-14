@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ColorEditor, PhotoEditor, SizePriceEditor } from "../components/CatalogOptionsEditor";
-import { type ProductConfiguration, type SetPiece } from "../lib/product-options";
+import { automaticSetPrices, money, type ProductConfiguration, type SetPiece } from "../lib/product-options";
 
 type Product = {
   id: string;
@@ -268,6 +268,7 @@ export default function AdminPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const selectedSet = setDefinitions.find((definition) => definition.id === setId) ?? null;
+  const automaticPrices = automaticSetPrices(form.price, form.compareAtPrice, pieces);
   const showDetails = !!form.id || (mode === "single" && !!choice) || (mode === "set" && !!selectedSet);
 
   function protectedHeaders(password = adminPassword): Record<string, string> {
@@ -404,6 +405,7 @@ export default function AdminPage() {
       if (incompletePiece) { setStatus("Every set piece needs an individual price. Names are filled automatically if left blank."); return; }
       const unsizedBed = pieces.find((piece) => needsSize(piece.type) && !piece.sizes.length);
       if (unsizedBed) { setStatus(`Choose a size for ${unsizedBed.name || "each bed item"}.`); return; }
+      if (pieces.some((piece)=>!piece.optional && piece.sizes.length) && !automaticPrices.sizes.length) { setStatus("The included sized pieces must share at least one available size."); return; }
     }
 
     setBusy(true);
@@ -412,8 +414,8 @@ export default function AdminPage() {
       let body: { product: Product } | { products: Product[] };
       if (mode === "set" && selectedSet) {
         const setChoice = { group: selectedSet.group, item: selectedSet.category };
-        const setSizes = Array.from(new Set(pieces.filter((piece) => !piece.optional).flatMap((piece) => piece.sizes)));
-        const setProduct: Product = { ...form, categories: categoriesFor(setChoice), sizes: setSizes, configuration: { ...form.configuration, setType: selectedSet.id, pieces: pieces.map((piece) => ({ ...piece, name: piece.name.trim() || `${form.name} — ${pieceLabel(piece.type)}` })) } };
+        const setSizes = automaticPrices.sizes;
+        const setProduct: Product = { ...form, categories: categoriesFor(setChoice), sizes: setSizes, configuration: { ...form.configuration, sizePrices: automaticPrices.sizePrices, sizeOriginalPrices: automaticPrices.sizeOriginalPrices, setType: selectedSet.id, pieces: pieces.map((piece) => ({ ...piece, name: piece.name.trim() || `${form.name} — ${pieceLabel(piece.type)}` })) } };
         const individualProducts: Product[] = pieces.map((piece) => ({
           id: piece.localId,
           sku: piece.sku,
@@ -618,7 +620,7 @@ export default function AdminPage() {
                 </div>
                 <label>Description<textarea value={form.description} onChange={(event) => update("description", event.target.value)} placeholder="Materials, pieces included, colors, and other details…" /></label>
                 <ColorEditor colors={form.colors} onChange={(colors) => update("colors", colors)} />
-                <p>{mode === "set" ? "Base set price includes the standard pieces only. Optional pieces are added to the customer total. Enter complete set prices for each size below." : "The base price applies when no size-specific price is entered."}</p>
+                <p>{mode === "set" ? `Enter the complete set price for the lowest-priced bed size${automaticPrices.baseSize ? ` (${automaticPrices.baseSize})` : ""}. Other sizes automatically add the bed price difference. Optional extras are added separately.` : "The base price applies when no size-specific price is entered."}</p>
                 <div className="fieldRow">
                   <label>Price ($)<input required min="0" step="0.01" type="number" value={form.price || ""} onChange={(event) => update("price", Number(event.target.value))} placeholder="1299" /></label>
                   <label>Original price, optional ($)<input min="0" step="0.01" type="number" value={form.compareAtPrice ?? ""} onChange={(event) => update("compareAtPrice", event.target.value ? Number(event.target.value) : null)} placeholder="1499" /></label>
@@ -671,7 +673,7 @@ export default function AdminPage() {
 
                       </article>
                     ))}
-                    {pieces.some((piece) => !piece.optional && piece.sizes.length) && <SizePriceEditor sizes={[...new Set(pieces.filter((piece)=>!piece.optional).flatMap((piece)=>piece.sizes))]} choices={[]} value={form.configuration} onChange={(value)=>update("configuration", {...form.configuration,...value})} label="Complete set price" />}
+                    {automaticPrices.sizes.length > 0 && <fieldset className="guidedBlock" aria-live="polite"><legend>Complete set prices — calculated automatically</legend><p>The base set price includes {automaticPrices.baseSize}. Adjust the individual bed prices above to change the difference between sizes.</p>{automaticPrices.sizes.map((size)=><p key={size}><strong>{size}: {money(automaticPrices.sizePrices[size])}</strong>{automaticPrices.sizeOriginalPrices[size] > automaticPrices.sizePrices[size] && <del className="originalPrice">{money(automaticPrices.sizeOriginalPrices[size])}</del>}</p>)}</fieldset>}
                   </section>
                 )}
 

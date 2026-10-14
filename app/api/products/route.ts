@@ -1,7 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { products } from "../../../db/schema";
-import { normalizeConfiguration, readConfiguration, type ProductConfiguration } from "../../lib/product-options";
+import { automaticSetPrices, normalizeConfiguration, readConfiguration, type ProductConfiguration } from "../../lib/product-options";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +140,9 @@ function safeArray(value: string | undefined) {
 }
 
 function present(row: typeof products.$inferSelect | StoredProduct | LocalStoredProduct) {
+  const configuration = readConfiguration(row.configurationJson);
+  const auto = configuration.setType && configuration.pieces?.some((piece)=>!piece.optional && piece.sizes.length)
+    ? automaticSetPrices(row.priceCents / 100, row.compareAtPriceCents == null ? null : row.compareAtPriceCents / 100, configuration.pieces) : null;
   return {
     id: row.id,
     slug: row.slug,
@@ -149,9 +152,9 @@ function present(row: typeof products.$inferSelect | StoredProduct | LocalStored
     price: row.priceCents / 100,
     compareAtPrice: row.compareAtPriceCents === null ? null : row.compareAtPriceCents / 100,
     categories: safeArray(row.categoriesJson),
-    sizes: safeArray(row.sizesJson),
+    sizes: auto?.sizes ?? safeArray(row.sizesJson),
     colors: safeArray(row.colorsJson),
-    configuration: readConfiguration(row.configurationJson),
+    configuration: auto ? {...configuration, sizePrices:auto.sizePrices, sizeOriginalPrices:auto.sizeOriginalPrices} : configuration,
     image: row.imageUrl,
     imageUrl: row.imageUrl,
     badge: row.badge,

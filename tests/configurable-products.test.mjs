@@ -10,7 +10,7 @@ async function compile(path, transform = (s)=>s) {
   return encode(ts.transpileModule(transform(await readFile(new URL(path,import.meta.url),'utf8')), {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
 }
 const optionsUrl = await compile('../app/lib/product-options.ts');
-const {selectionPrice,listingPrice,normalizeConfiguration} = await import(optionsUrl);
+const {selectionPrice,listingPrice,normalizeConfiguration,automaticSetPrices} = await import(optionsUrl);
 const cartUrl = await compile('../app/lib/cart.ts',(s)=>s.replace('"./product-options"',JSON.stringify(optionsUrl)));
 const {addCartLine} = await import(cartUrl);
 const chest = {localId:'chest',type:'Chests',name:'Oak Chest',description:'Five drawers',sku:'C1',price:200,compareAtPrice:250,imageUrl:'',sizes:[],optional:true,configuration:{}};
@@ -18,7 +18,7 @@ const bed = {...chest,localId:'bed',type:'Beds',name:'Oak Bed',optional:false,si
 const product = {id:'set',name:'Oak Bedroom',price:1000,compareAtPrice:1300,categories:['Bedroom'],image:'https://example.com/main.jpg',colors:['Gray','Brown'],sizes:['Queen','King'],configuration:{setType:'bedroom-set',sizePrices:{Queen:1000,King:1200},sizeOriginalPrices:{Queen:1300,King:1550},images:[{url:'https://example.com/brown.jpg',color:'Brown'}],pieces:[bed,chest]}};
 
 test('size and optional piece totals use cents and valid sale comparisons',()=>{
-  assert.deepEqual(selectionPrice(product,'King',['chest']),{total:1400,original:1800});
+  assert.deepEqual(selectionPrice(product,'King',['chest']),{total:1400,original:1750});
   assert.deepEqual(selectionPrice(product,'Queen'),{total:1000,original:1300});
   assert.equal(listingPrice(product).total,1000); assert.equal(listingPrice(product).from,true);
   assert.equal(selectionPrice({price:100,compareAtPrice:90},'').original,null);
@@ -58,12 +58,26 @@ test('Mac API persists configuration/description and upserts linked pieces witho
     assert.equal((await post([{...product,configuration:{...product.configuration,sizePrices:{Queen:1100,King:1300}}},{...child,description:'Updated description'}])).status,201);
     let rows=(await (await api.GET(new Request('http://localhost/api/products'))).json()).products;
     assert.equal(rows.length,2); assert.equal(rows.find(p=>p.id==='bed').description,'Updated description');
-    assert.equal(rows.find(p=>p.id==='set').configuration.sizePrices.King,1300);
+    assert.equal(rows.find(p=>p.id==='set').configuration.sizePrices.King,1200);
     const {configuration,...legacyImport}=product;
     assert.equal((await post([legacyImport])).status,201);
     rows=(await (await api.GET(new Request('http://localhost/api/products'))).json()).products;
-    assert.equal(rows.find(p=>p.id==='set').configuration.sizePrices.King,1300);
+    assert.equal(rows.find(p=>p.id==='set').configuration.sizePrices.King,1200);
     const invalid = await post([{...product,configuration:{sizePrices:{King:-1}}}]);
     assert.notEqual(invalid.status,201);
   } finally { process.env=old; await rm(folder,{recursive:true,force:true}); }
+});
+
+test('set prices follow bed adjustments, preserve package discount and ignore stale manual totals',()=>{
+  const changed = {...product, configuration:{...product.configuration, sizePrices:{Queen:9999,King:9999}, pieces:[{...bed,configuration:{sizePrices:{Queen:500,King:850}}},chest]}};
+  assert.equal(selectionPrice(changed,'Queen').total,1000);
+  assert.equal(selectionPrice(changed,'King').total,1350);
+  assert.equal(selectionPrice(changed,'King',['chest']).total,1550);
+  assert.equal(selectionPrice(changed,'King').original,1650);
+  assert.equal(addCartLine([],changed,'Brown','King',2,['chest'])[0].unitPrice,1550);
+  const auto = automaticSetPrices(1000,null,[{...bed,configuration:{sizePrices:{Queen:900,King:700}}}]);
+  assert.equal(auto.baseSize,'King');
+  assert.equal(auto.sizePrices.Queen,1200);
+  assert.deepEqual(auto.sizeOriginalPrices,{});
+  assert.equal(automaticSetPrices(1000,null,[{...bed,sizes:['Queen'],configuration:{}}]).sizePrices.Queen,1000);
 });
