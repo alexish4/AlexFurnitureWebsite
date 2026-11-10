@@ -42,6 +42,13 @@ npm run build
 
 Open `/admin` from the same local URL.
 
+Product photo fields accept licensed image URLs **or** a file chosen from your
+computer (JPEG, PNG, WebP, or GIF, up to 8 MB). File upload is available when
+`SELF_HOSTED=true`; uploaded photos are saved alongside the catalog in
+`.data/uploads/`, then served from `/api/uploads/<filename>`. The URL-only
+option remains available on other hosting providers. The photo chooser works
+for the main product photo, individual set pieces, and extra/color photos.
+
 The easiest way to add a few products is the form. For a large catalog:
 
 1. Select **Download template**.

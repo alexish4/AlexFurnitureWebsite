@@ -4,13 +4,14 @@
 
 Yes. A 2017 Intel i5 MacBook Pro with 8 GB of memory is sufficient for this
 storefront, its catalog manager, and normal traffic for a small local furniture
-business. Product images are loaded from their licensed external URLs, so the
-Mac does not need to resize or serve large image libraries.
+business. Product photos can use licensed external URLs or images uploaded through
+`/admin`. Uploaded images are served by the Mac and stored in `.data/uploads/`.
+Use reasonably compressed photos and leave room on the Mac's disk.
 
 The limitations are availability rather than raw speed: the site goes offline
 if the Mac sleeps, loses power or Internet, reboots before login, or develops a
 hardware problem. Keep the Mac ventilated, connected to power and Ethernet when
-possible, and keep a backup of `.data/products.json`.
+possible, and back up both `.data/products.json` and `.data/uploads/`.
 
 This is suitable for a catalog and call-to-order storefront. Do not process or
 store credit-card numbers directly on this Mac. Add a hosted payment provider
@@ -120,11 +121,16 @@ provides the complete service-install command.
 
 ## Backups and updates
 
-Back up this file after catalog changes:
+Back up the catalog and uploaded photos after catalog changes:
 
 ```text
 .data/products.json
+.data/uploads/
 ```
+
+Uploaded image URLs continue to work after restarting the website as long as
+the `.data/uploads/` folder is preserved. Deleting a product does not
+automatically delete its uploaded photos.
 
 Time Machine can protect the entire project folder. Before a code update, make
 an additional copy of the catalog file. After replacing code files, run:

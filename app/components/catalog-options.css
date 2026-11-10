@@ -3,6 +3,9 @@
 .optionButtons button[aria-pressed=true],.sizePriceRow>button[aria-pressed=true] { background:#243c35; color:white; }
 .sizePriceRow { display:grid; grid-template-columns:120px 1fr 1fr; align-items:center; gap:12px; margin:10px 0; }
 .customColor { display:flex; gap:10px; }
+.imageUploadField { display:grid; gap:10px; margin:12px 0; }
+.imageUploadField input[type=file] { max-width:100%; }
+.imageUploadError { color:#a22318; font-weight:650; }
 .photoEditorRow { display:grid; gap:10px; margin:16px 0; padding:14px; background:#f2f0e9; border-radius:10px; }
 .photoEditorRow img { width:100px; height:80px; object-fit:contain; }
 .pieceOptional { display:flex!important; align-items:center; gap:12px; padding:16px; background:#e4eee5; }

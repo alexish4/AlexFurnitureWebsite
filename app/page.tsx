@@ -44,6 +44,7 @@ const menuGroups = [
     label: "Living Rooms",
     items: [
       "Living Room Sets",
+      "Custom Designed Sofas",
       "Wall Units",
       "Sectionals",
       "Sleeper Sofas",
@@ -67,6 +68,7 @@ const menuGroups = [
       "Daybeds",
       "Chests",
       "Dresser",
+      "Mirrors",
       "Headboards",
       "Nightstands",
     ],

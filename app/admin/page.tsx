@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import CatalogImageField from "../components/CatalogImageField";
 import { ColorEditor, PhotoEditor, SizePriceEditor } from "../components/CatalogOptionsEditor";
 import { automaticSetPrices, money, type ProductConfiguration, type SetPiece } from "../lib/product-options";
 
@@ -71,14 +72,14 @@ const taxonomy = [
   {
     label: "Living Rooms",
     items: [
-      "Living Room Sets", "Wall Units", "Sectionals", "Sleeper Sofas", "Bookcases",
+      "Living Room Sets", "Custom Designed Sofas", "Wall Units", "Sectionals", "Sleeper Sofas", "Bookcases",
       "Sofas", "Cabinets", "Chairs", "Coffee Table", "Sofa Table", "End Table",
       "Loveseats", "Ottomans", "Recliners",
     ],
   },
   {
     label: "Kids & Teens",
-    items: ["Bedroom Sets", "Beds", "Daybeds", "Chests", "Dresser", "Headboards", "Nightstands"],
+    items: ["Bedroom Sets", "Beds", "Daybeds", "Chests", "Dresser", "Mirrors", "Headboards", "Nightstands"],
   },
   {
     label: "Entertainment",
@@ -103,7 +104,7 @@ const setDefinitions: SetDefinition[] = [
     label: "Kids & teens bedroom set",
     group: "Kids & Teens",
     category: "Bedroom Sets",
-    pieceOptions: ["Beds", "Daybeds", "Dresser", "Nightstands", "Chests", "Headboards"],
+    pieceOptions: ["Beds", "Daybeds", "Dresser", "Mirrors", "Nightstands", "Chests", "Headboards"],
   },
   {
     id: "dining-set",
@@ -261,6 +262,7 @@ export default function AdminPage() {
   const [pieces, setPieces] = useState<PieceDraft[]>([]);
   const [status, setStatus] = useState("Loading your catalog…");
   const [busy, setBusy] = useState(false);
+  const [uploadCount, setUploadCount] = useState(0);
   const [query, setQuery] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -273,6 +275,10 @@ export default function AdminPage() {
 
   function protectedHeaders(password = adminPassword): Record<string, string> {
     return password ? { "X-Admin-Password": password } : {};
+  }
+
+  function trackUpload(uploading: boolean) {
+    setUploadCount((current) => Math.max(0, current + (uploading ? 1 : -1)));
   }
 
   async function loadProducts(password = adminPassword) {
@@ -394,6 +400,7 @@ export default function AdminPage() {
   async function saveProduct(event: React.FormEvent) {
     event.preventDefault();
 
+    if (uploadCount > 0) { setStatus("Finish uploading photos before saving."); return; }
     if (mode === "single" && choice && needsSize(choice.item) && !form.sizes.length) {
       setStatus("Choose at least one size for this bed item.");
       return;
@@ -625,8 +632,8 @@ export default function AdminPage() {
                   <label>Price ($)<input required min="0" step="0.01" type="number" value={form.price || ""} onChange={(event) => update("price", Number(event.target.value))} placeholder="1299" /></label>
                   <label>Original price, optional ($)<input min="0" step="0.01" type="number" value={form.compareAtPrice ?? ""} onChange={(event) => update("compareAtPrice", event.target.value ? Number(event.target.value) : null)} placeholder="1499" /></label>
                 </div>
-                <label>Product photo URL<input value={form.imageUrl} onChange={(event) => update("imageUrl", event.target.value)} placeholder="https://manufacturer.com/product-photo.jpg" /></label>
-                <PhotoEditor value={form.configuration} colors={form.colors} onChange={(value) => update("configuration", {...form.configuration,...value})} />
+                <CatalogImageField label="Product photo URL" value={form.imageUrl} onChange={(url) => update("imageUrl", url)} adminPassword={adminPassword} onUploadStateChange={trackUpload} />
+                <PhotoEditor value={form.configuration} colors={form.colors} onChange={(value) => update("configuration", {...form.configuration,...value})} adminPassword={adminPassword} onUploadStateChange={trackUpload} />
                 {form.imageUrl && <img className="imagePreview" src={form.imageUrl} alt="Product preview" />}
                 <div className="fieldRow">
                   <label>Vendor / manufacturer<input value={form.vendor} onChange={(event) => update("vendor", event.target.value)} placeholder="Ashley, Coaster, etc." /></label>
@@ -667,8 +674,8 @@ export default function AdminPage() {
                           <label>Individual price ($)<input required min="0.01" step="0.01" type="number" value={piece.price || ""} onChange={(event) => updatePiece(piece.localId, "price", Number(event.target.value))} /></label>
                           <label>Original price, optional ($)<input min="0" step="0.01" type="number" value={piece.compareAtPrice ?? ""} onChange={(event) => updatePiece(piece.localId, "compareAtPrice", event.target.value ? Number(event.target.value) : null)} /></label>
                         </div>
-                        <label>Piece photo URL, optional<input value={piece.imageUrl} onChange={(event) => updatePiece(piece.localId, "imageUrl", event.target.value)} placeholder="Leave blank to use the set photo" /></label>
-                        <PhotoEditor value={piece.configuration} colors={form.colors} onChange={(value)=>updatePiece(piece.localId,"configuration",value)} />
+                        <CatalogImageField label="Piece photo URL, optional" value={piece.imageUrl} onChange={(url) => updatePiece(piece.localId, "imageUrl", url)} adminPassword={adminPassword} onUploadStateChange={trackUpload} placeholder="Leave blank to use the set photo" />
+                        <PhotoEditor value={piece.configuration} colors={form.colors} onChange={(value)=>updatePiece(piece.localId,"configuration",value)} adminPassword={adminPassword} onUploadStateChange={trackUpload} />
                         {needsSize(piece.type) && <SizePriceEditor sizes={piece.sizes} choices={bedSizes} value={piece.configuration} onSizes={(sizes)=>updatePiece(piece.localId,"sizes",sizes)} onChange={(value)=>updatePiece(piece.localId,"configuration",value)} label="Individual price" />}
 
                       </article>
@@ -677,7 +684,7 @@ export default function AdminPage() {
                   </section>
                 )}
 
-                <button className="primaryAdminButton" disabled={busy}>
+                <button className="primaryAdminButton" disabled={busy || uploadCount > 0}>
                   {form.id ? "Save changes" : mode === "set" ? `Create set + ${pieces.length} individual item${pieces.length === 1 ? "" : "s"}` : "Add product"}
                 </button>
                 {!form.id && mode === "set" && <span className="saveSummary">One click saves the complete set and all pieces listed above.</span>}

@@ -64,7 +64,7 @@ export function normalizeConfiguration(raw: unknown): ProductConfiguration {
     if (input.images !== undefined && (!Array.isArray(input.images) || input.images.length > 30)) throw new Error("Use up to 30 photos per product.");
     const images = (input.images || []).filter((photo) => photo && text(photo.url)).map((photo) => {
       const url = text(photo.url, 2000);
-      if (!/^https?:\/\//i.test(url)) throw new Error("Photo links must begin with https:// or http://.");
+      if (!/^https?:\/\//i.test(url) && !/^\/api\/uploads\/[0-9a-f-]{36}\.(jpg|png|webp|gif)$/.test(url)) throw new Error("Use a http(s) link or an uploaded photo.");
       return { url, color: text(photo.color,80) };
     });
     return { images, sizePrices: prices(input.sizePrices), sizeOriginalPrices: prices(input.sizeOriginalPrices) };

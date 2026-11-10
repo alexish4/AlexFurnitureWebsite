@@ -2,6 +2,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { products } from "../../../db/schema";
 import { automaticSetPrices, normalizeConfiguration, readConfiguration, type ProductConfiguration } from "../../lib/product-options";
+import { isAdmin, isSelfHosted } from "../../lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -165,10 +166,6 @@ function present(row: typeof products.$inferSelect | StoredProduct | LocalStored
   };
 }
 
-function isSelfHosted() {
-  return process.env.SELF_HOSTED === "true";
-}
-
 function toLocalStoredProduct(row: StoredProduct): LocalStoredProduct {
   return {
     ...row,
@@ -210,27 +207,6 @@ async function readLocalCatalog(): Promise<LocalStoredProduct[]> {
     await writeLocalCatalog(seeded);
     return seeded;
   }
-}
-
-function adminEmailSet() {
-  return new Set(
-    (process.env.ADMIN_EMAILS ?? "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
-}
-
-function isAdmin(request: Request) {
-  if (process.env.NODE_ENV !== "production") return true;
-  const email = request.headers.get("oai-authenticated-user-email")?.toLowerCase();
-  const allowed = adminEmailSet();
-  const emailAllowed = Boolean(email && allowed.size > 0 && allowed.has(email));
-  const expectedPassword = process.env.ADMIN_PASSWORD ?? "";
-  const suppliedPassword = request.headers.get("x-admin-password") ?? "";
-  const passwordAllowed =
-    isSelfHosted() && expectedPassword.length >= 12 && suppliedPassword === expectedPassword;
-  return emailAllowed || passwordAllowed;
 }
 
 async function seedIfEmpty() {
