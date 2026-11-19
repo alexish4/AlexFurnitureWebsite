@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { readUploadResponse } from "../lib/upload-response";
 
 type Props = {
   label: string;
@@ -38,9 +39,7 @@ export default function CatalogImageField({ label, value, onChange, adminPasswor
         headers: adminPassword ? { "X-Admin-Password": adminPassword } : {},
         body,
       });
-      const data = await response.json();
-      if (!response.ok || typeof data.url !== "string") throw new Error(data.error || "Could not upload photo.");
-      onChange(data.url);
+      onChange(await readUploadResponse(response));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not upload photo.");
     } finally {
